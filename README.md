@@ -10,7 +10,15 @@ Agenda online sencilla. Stack alineado con Team Prime Digital:
 | Proxy | **Traefik v3** |
 | Runtime | **Docker Compose** + pnpm + Node 22 |
 
-Nombre de marca: pendiente. Ver [`docs/features.md`](docs/features.md).
+### Documentación
+
+| Documento | Contenido |
+|-----------|-----------|
+| [`docs/features.md`](docs/features.md) | Producto y features |
+| [`docs/architecture/back.md`](docs/architecture/back.md) | Arquitectura NestJS (igual TPD) |
+| [`docs/architecture/front.md`](docs/architecture/front.md) | Arquitectura Next.js (igual TPD) |
+| [`docs/architecture/bd.md`](docs/architecture/bd.md) | Migraciones PostgreSQL (igual TPD) |
+| [`backend/BD/README.md`](backend/BD/README.md) | Carpeta de migraciones |
 
 ---
 
