@@ -1,0 +1,39 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Build / cache
+dist/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Variables de entorno (secretos)
+.env
+.env.*
+!.env.example
+!.env.prod.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Docker / misc
+.cache/
+
+# Datos locales de Postgres
+data/postgres/
