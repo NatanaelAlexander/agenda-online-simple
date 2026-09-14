@@ -82,6 +82,9 @@ export class UpdateBusinessDto {
   qrPosterHeadline?: string | null;
 
   @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString({ message: 'El pie del afiche debe ser texto' })
+  @MaxLength(300)
   qrPosterFooter?: string | null;
 
   @ApiPropertyOptional({
