@@ -193,7 +193,7 @@ export function ProfessionalsPage() {
         <CardHeader>
           <CardTitle className="text-base">Listado</CardTitle>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="space-y-3">
           {loading ? (
             <p className="text-sm text-muted-foreground">Cargando…</p>
           ) : items.length === 0 ? (
@@ -201,6 +201,21 @@ export function ProfessionalsPage() {
               Aún no hay profesionales. Crea el primero.
             </p>
           ) : (
+            <>
+            <div className="space-y-2 md:hidden">
+              {items.map((pro) => (
+                <div
+                  key={pro.id}
+                  className="rounded-lg border border-border px-3 py-2.5"
+                >
+                  <p className="truncate text-sm font-medium">{pro.displayName}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {pro.email ?? "Sin correo"}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[420px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-muted-foreground">
@@ -235,6 +250,8 @@ export function ProfessionalsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>

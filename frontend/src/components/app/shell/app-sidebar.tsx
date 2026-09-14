@@ -24,22 +24,85 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { AnimatePresence, motion } from "motion/react";
 
-const primaryNav = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  exact?: boolean;
+  /** Si falta, el ítem es visible para cualquier sesión interna. */
+  anyPermission?: string[];
+  roles?: string[];
+};
+
+const primaryNav: NavItem[] = [
   { href: "/app", label: "Inicio", icon: LayoutDashboard, exact: true },
-  { href: "/app/citas", label: "Citas", icon: CalendarDays },
-] as const;
+  {
+    href: "/app/citas",
+    label: "Citas",
+    icon: CalendarDays,
+    anyPermission: ["appointments:read"],
+  },
+];
 
-const adminNav = [
-  { href: "/app/servicios", label: "Servicios", icon: Scissors },
-  { href: "/app/clientes", label: "Clientes", icon: Users },
-  { href: "/app/profesionales", label: "Profesionales", icon: UserRound },
-  { href: "/app/negocio", label: "Negocio", icon: Building2 },
-  { href: "/app/agenda", label: "Agenda", icon: CalendarClock },
-] as const;
+const adminNav: NavItem[] = [
+  {
+    href: "/app/servicios",
+    label: "Servicios",
+    icon: Scissors,
+    anyPermission: ["services:read"],
+  },
+  {
+    href: "/app/clientes",
+    label: "Clientes",
+    icon: Users,
+    anyPermission: ["clients:read"],
+  },
+  {
+    href: "/app/profesionales",
+    label: "Profesionales",
+    icon: UserRound,
+    anyPermission: ["professionals:read"],
+  },
+  {
+    href: "/app/negocio",
+    label: "Negocio",
+    icon: Building2,
+    anyPermission: ["businesses:read"],
+  },
+  {
+    href: "/app/agenda",
+    label: "Agenda",
+    icon: CalendarClock,
+    anyPermission: ["appointments:read", "availability:read"],
+  },
+];
 
-const internoNav = [
-  { href: "/app/interno", label: "Usuarios", icon: Shield },
-] as const;
+const internoNav: NavItem[] = [
+  {
+    href: "/app/interno",
+    label: "Usuarios",
+    icon: Shield,
+    roles: ["super_admin"],
+  },
+];
+
+function canSeeNavItem(
+  item: NavItem,
+  claims: { roles: string[]; permissions: string[] } | null,
+): boolean {
+  if (!claims) return false;
+  if (claims.roles.includes("super_admin")) return true;
+  if (claims.permissions.includes("system:manage")) return true;
+  if (item.roles?.length) {
+    return item.roles.some((role) => claims.roles.includes(role));
+  }
+  if (item.anyPermission?.length) {
+    return item.anyPermission.some((perm) =>
+      claims.permissions.includes(perm),
+    );
+  }
+  return true;
+}
 
 function NavLink({
   href,
@@ -88,6 +151,13 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   }, [claims]);
 
   const isSuperAdmin = !!claims?.roles?.includes("super_admin");
+  const visiblePrimary = primaryNav.filter((item) =>
+    canSeeNavItem(item, claims),
+  );
+  const visibleAdmin = adminNav.filter((item) => canSeeNavItem(item, claims));
+  const visibleInterno = internoNav.filter((item) =>
+    canSeeNavItem(item, claims),
+  );
 
   React.useEffect(() => {
     function onDocClick(event: MouseEvent) {
@@ -113,36 +183,47 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
-        {primaryNav.map((item) => (
+        {visiblePrimary.map((item) => (
           <NavLink
             key={item.href}
-            {...item}
+            href={item.href}
+            label={item.label}
+            icon={item.icon}
+            exact={item.exact}
             pathname={pathname}
             onNavigate={onNavigate}
           />
         ))}
 
-        <p className="mt-4 mb-1 px-3 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-          Administración
-        </p>
-        {adminNav.map((item) => (
+        {visibleAdmin.length > 0 ? (
+          <p className="mt-4 mb-1 px-3 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+            Administración
+          </p>
+        ) : null}
+        {visibleAdmin.map((item) => (
           <NavLink
             key={item.href}
-            {...item}
+            href={item.href}
+            label={item.label}
+            icon={item.icon}
+            exact={item.exact}
             pathname={pathname}
             onNavigate={onNavigate}
           />
         ))}
 
-        {isSuperAdmin ? (
+        {visibleInterno.length > 0 ? (
           <>
             <p className="mt-4 mb-1 px-3 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               Interno
             </p>
-            {internoNav.map((item) => (
+            {visibleInterno.map((item) => (
               <NavLink
                 key={item.href}
-                {...item}
+                href={item.href}
+                label={item.label}
+                icon={item.icon}
+                exact={item.exact}
                 pathname={pathname}
                 onNavigate={onNavigate}
               />
@@ -176,17 +257,20 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               <Settings className="size-4 opacity-70" />
               Configuración
             </Link>
-            <Link
-              href="/app/estilos"
-              className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted"
-              onClick={() => {
-                setMenuOpen(false);
-                onNavigate?.();
-              }}
-            >
-              <Palette className="size-4 opacity-70" />
-              Estilos del sistema
-            </Link>
+            {isSuperAdmin ||
+            claims?.permissions?.includes("system:manage") ? (
+              <Link
+                href="/app/estilos"
+                className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onNavigate?.();
+                }}
+              >
+                <Palette className="size-4 opacity-70" />
+                Estilos del sistema
+              </Link>
+            ) : null}
             <Link
               href="/app/terminos"
               className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted"

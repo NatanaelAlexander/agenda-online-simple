@@ -50,6 +50,14 @@ export const SQL_FIND_APPOINTMENT_BY_CANCEL_TOKEN = `
   WHERE a.cancel_token = $1
 `;
 
+export const SQL_FIND_APPOINTMENTS_BY_CANCEL_TOKENS = `
+  SELECT ${APPOINTMENT_DETAIL_COLUMNS}
+  ${SQL_APPOINTMENT_JOINS}
+  WHERE a.cancel_token = ANY($1::text[])
+    AND ($2::text IS NULL OR b.slug = $2)
+  ORDER BY a.starts_at ASC
+`;
+
 export const SQL_FIND_ALL_APPOINTMENTS_BASE = `
   SELECT ${APPOINTMENT_DETAIL_COLUMNS}
   ${SQL_APPOINTMENT_JOINS}
@@ -179,16 +187,33 @@ export const SQL_FIND_SCHEDULES = `
   WHERE business_id = $1
 `;
 
+export const SQL_FIND_PROFESSIONAL_SCHEDULES = `
+  SELECT
+    weekday,
+    to_char(start_time, 'HH24:MI:SS') AS "startTime",
+    to_char(end_time, 'HH24:MI:SS') AS "endTime"
+  FROM professional_schedules
+  WHERE professional_id = $1
+`;
+
 export const SQL_FIND_EXCEPTIONS = `
   SELECT
     to_char(exception_date, 'YYYY-MM-DD') AS "exceptionDate",
     is_closed AS "isClosed",
     CASE WHEN start_time IS NULL THEN NULL ELSE to_char(start_time, 'HH24:MI:SS') END AS "startTime",
-    CASE WHEN end_time IS NULL THEN NULL ELSE to_char(end_time, 'HH24:MI:SS') END AS "endTime"
+    CASE WHEN end_time IS NULL THEN NULL ELSE to_char(end_time, 'HH24:MI:SS') END AS "endTime",
+    professional_id AS "professionalId"
   FROM schedule_exceptions
   WHERE exception_date = $1::date
     AND business_id = $2
-    AND professional_id IS NULL
+    AND (
+      ($3::uuid IS NULL AND professional_id IS NULL)
+      OR (
+        $3::uuid IS NOT NULL
+        AND (professional_id IS NULL OR professional_id = $3::uuid)
+      )
+    )
+  ORDER BY CASE WHEN professional_id IS NULL THEN 1 ELSE 0 END
 `;
 
 export const SQL_FIND_BUSY_APPOINTMENTS = `
@@ -201,6 +226,7 @@ export const SQL_FIND_BUSY_APPOINTMENTS = `
     AND st.code IN ('pending', 'confirmed', 'attended')
     AND a.starts_at < $3::timestamptz
     AND a.ends_at > $2::timestamptz
+    AND ($4::uuid IS NULL OR a.professional_id = $4::uuid)
 `;
 
 export const SQL_LOCK_OVERLAPPING_APPOINTMENTS = `
@@ -212,6 +238,7 @@ export const SQL_LOCK_OVERLAPPING_APPOINTMENTS = `
     AND a.starts_at < $3::timestamptz
     AND a.ends_at > $2::timestamptz
     AND ($4::uuid IS NULL OR a.id <> $4::uuid)
+    AND ($5::uuid IS NULL OR a.professional_id = $5::uuid)
   FOR UPDATE OF a
 `;
 

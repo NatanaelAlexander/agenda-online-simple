@@ -100,3 +100,14 @@ export async function portalAppointmentStatus(
 export function googleBookingAuthUrl(): string {
   return `${API_BASE_URL}/api/auth/google`;
 }
+
+
+export async function portalMyAppointments(input: {
+  cancelTokens: string[];
+  businessSlug?: string;
+}): Promise<Appointment[]> {
+  return apiFetch<Appointment[]>("/portal/appointments/mias", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}

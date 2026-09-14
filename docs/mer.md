@@ -498,7 +498,9 @@ erDiagram
 
 ## 8 · Appointments (agendación)
 
-La cita concreta. Registro completo en BD (solo internos lo ven completo). El cliente ve **la suya** vía cookie + email/`cancel_token`.
+La cita concreta. Registro completo en BD (solo internos lo ven completo **sin** exponer `cancel_token` en JSON internal). El cliente ve **la suya** vía cookie + `cancel_token` / `POST …/mias`.
+
+Reglas de cupo (runtime, no tabla): ver [`architecture/practicas.md`](architecture/practicas.md) §3 — con `professional_id` el busy/lock/schedules van al profesional; sin él, al negocio.
 
 ```mermaid
 erDiagram
@@ -569,9 +571,9 @@ flowchart LR
   G --> H[Email / WhatsApp]
 ```
 
-Slots = `professional_schedules` − `schedule_exceptions` − citas activas − duración/buffers del `service`.
+Slots = (horarios del pro o fallback negocio) − excepciones (pro ∪ negocio) − citas activas del **ámbito** − duración/buffers del `service`. Tope: `businesses.max_bookings_per_slot`. Detalle: [`architecture/practicas.md`](architecture/practicas.md).
 
-Público ve solo slots libres/ocupados (anónimo). Internos ven quién reservó.
+Público ve solo `booked/capacity` (anónimo). Internos ven quién reservó (sin `cancel_token` en API staff).
 
 ---
 

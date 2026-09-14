@@ -31,6 +31,7 @@ import {
   ConfirmPortalAppointmentDto,
   CreateAppointmentDto,
   FilterAppointmentsDto,
+  PortalMineAppointmentsDto,
   PortalSlotsDto,
   RescheduleAppointmentDto,
 } from './dto/appointment.dto.js';
@@ -182,5 +183,17 @@ export class PortalAppointmentsController {
   @ApiOkResponse({ type: AppointmentResponseDto })
   status(@Body() dto: CancelPortalAppointmentDto) {
     return this.appointmentsService.getPortalStatus(dto.cancelToken);
+  }
+
+  @Post('mias')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Listar mis citas por cancelTokens (cookie como caché)' })
+  @ApiBody({ type: PortalMineAppointmentsDto })
+  @ApiOkResponse({ type: [AppointmentResponseDto] })
+  mine(@Body() dto: PortalMineAppointmentsDto) {
+    return this.appointmentsService.listPortalByCancelTokens({
+      cancelTokens: dto.cancelTokens,
+      businessSlug: dto.businessSlug,
+    });
   }
 }

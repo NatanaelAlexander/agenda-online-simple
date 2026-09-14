@@ -20,7 +20,7 @@ import { SystemBrandingService } from './system-branding.service.js';
 
 @ApiBearerAuth('access-token')
 @AuthorizeSurface('internal')
-@AuthorizeResource('businesses')
+@AuthorizeResource('system')
 @ApiTags('System — Branding')
 @Controller('internal/system/branding')
 export class InternalSystemBrandingController {
@@ -28,7 +28,7 @@ export class InternalSystemBrandingController {
 
   @Post()
   @HttpCode(HttpStatus.OK)
-  @AuthorizeAction('read')
+  @AuthorizeAction('manage')
   @ApiOperation({ summary: 'Branding de la instalación' })
   @ApiOkResponse({ type: AppBrandingResponseDto })
   get() {
@@ -37,7 +37,7 @@ export class InternalSystemBrandingController {
 
   @Patch('update')
   @HttpCode(HttpStatus.OK)
-  @AuthorizeAction('update')
+  @AuthorizeAction('manage')
   @ApiOperation({ summary: 'Actualizar colores y layout de home' })
   @ApiBody({ type: UpdateAppBrandingDto })
   @ApiOkResponse({ type: AppBrandingResponseDto })
@@ -47,7 +47,7 @@ export class InternalSystemBrandingController {
 
   @Post('reset')
   @HttpCode(HttpStatus.OK)
-  @AuthorizeAction('update')
+  @AuthorizeAction('manage')
   @ApiOperation({ summary: 'Restablecer branding por defecto' })
   @ApiOkResponse({ type: AppBrandingResponseDto })
   reset() {

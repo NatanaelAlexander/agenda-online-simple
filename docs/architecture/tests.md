@@ -160,16 +160,21 @@ Atajo desde la raíz del repo (script):
 3. Utils en `common/` → `*.spec.ts` al lado.  
 4. No romper el shape JSON / status que el front ya consume.  
 5. El push a `main` no debe dejar tests rojos (workflow GitHub).  
-6. **Actualizar docs** (`docs/architecture/*`, `features.md`, flujos) cuando cambie un contrato o UX de flujo.
+6. **Actualizar docs** (`docs/architecture/*`, `features.md`, flujos) cuando cambie un contrato o UX de flujo.  
+7. Si toca **cupos / profesional / ventana / auth**: seguir [`practicas.md`](practicas.md) y cubrir al menos un unit (params SQL o excepción de dominio).
 
-### Endpoints recientes a cubrir en API contrato
+### Endpoints a cubrir en API contrato / unit
 
-| Feature | Endpoint | Spec |
-|---------|----------|------|
+| Feature | Endpoint / regla | Spec |
+|---------|------------------|------|
 | Professionals | `POST …/schedules/listar` | `professionals.api.spec.ts` |
 | Professionals | `POST …/set-schedules` | idem |
 | Businesses portal | `GET …/catalog` (+ `schedules`) | `businesses.api.spec.ts` |
 | Businesses | `PATCH …/update` (`bookingEnabled`, QR texts) | idem |
+| Appointments | Capacidad + ventana + pro | `appointments/tests/unit/appointments-capacity.unit.spec.ts` |
+| Appointments portal | `slots` / `confirm` / `mias` / `cancel` / `estado` | `portal-appointments.api.spec.ts` |
+| System | branding con `system:manage` | `system-branding.api.spec.ts` |
+| App | `GET /health` | `test/app.e2e-spec.ts` |
 
 ---
 

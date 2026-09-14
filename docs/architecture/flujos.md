@@ -59,9 +59,12 @@ flowchart TD
 
 ### Disponibilidad
 
-- Horarios semanales: tabla `professional_schedules` (0=dom … 6=sáb).
+- Horarios semanales: `professional_schedules` (0=dom … 6=sáb); si el pro no tiene filas → fallback `business_schedules`.
+- Excepciones: `schedule_exceptions` (pro específico o `professional_id` null = todo el local); al resolver el día, preferir la del pro.
 - Catálogo portal (`GET /portal/businesses/:slug/catalog`) incluye `schedules` por profesional.
-- Slots: `POST /portal/appointments/slots` = horarios − excepciones − citas − duración/buffers.
+- Slots: `POST /portal/appointments/slots` = horarios − excepciones − citas **del ámbito** (pro o negocio) − duración/buffers.
+- Respuesta slot: `{ startsAt, booked, capacity, remaining }` — UI muestra **`booked/capacity`**.
+- Al **confirmar / crear / reprogramar**: el `startsAt` debe ser un slot abierto con cupo; si hay pro+servicio → fila en `professional_services`.
 - UI: días sin schedule deshabilitados; slots solo en overlay tras elegir día.
 
 ### Staff configura horarios
@@ -105,23 +108,27 @@ flowchart LR
 
 ### Cookie del cliente (solo su vista)
 
-Tras agendar, el navegador guarda algo como (nombre tentativo `aos_booking`):
+Tras agendar, el navegador guarda **una lista** en `aos_booking` (compatible con objeto único legacy):
 
 | Dato | Para qué |
 |------|----------|
-| email | Identificar al volver |
-| nombre | Mostrar saludo / resumen |
-| appointment_id | Referencia |
-| starts_at / ends_at | “Tu hora” |
-| service_name / professional_name | Qué agendó |
-| business_slug | De qué negocio |
+| email / name | Saludo / resumen |
+| appointmentId | Referencia |
+| startsAt / endsAt | “Tu hora” |
+| serviceName / professionalName | Qué agendó |
+| businessSlug | De qué negocio |
+| **cancelToken** | Cancelar / consultar estado / sync |
+| statusCode / cancelledBy | UI de estado |
 
 Al volver a la página pública:
 
-- Si hay cookie válida → mostrar **“Tu hora: …”** (solo la suya).
-- El calendario compartido sigue mostrando solo disponibilidad (no nombres de otros).
+- Cookie = **caché**. Sync: `POST /portal/appointments/mias` con los `cancelTokens` (+ `businessSlug`).
+- Mostrar **“mis horas”** (solo las suyas); el calendario sigue sin nombres ajenos.
+- Contadores de slot: ocupados/capacidad, no datos de otros clientes.
 
-Cancelar/reprogramar: link con `cancel_token` (email) y/o flujo ligado a la cookie + Google si hace falta revalidar.
+Cancelar: `POST /portal/appointments/cancel` con `cancelToken`.
+
+**Internal nunca** debe devolver `cancelToken` en listados/detalle staff.
 
 ### Qué NO hace el cliente
 
@@ -135,5 +142,8 @@ Cancelar/reprogramar: link con `cancel_token` (email) y/o flujo ligado a la cook
 
 | Visible para todos | Solo el cliente dueño | Solo internos (`/app`) |
 |--------------------|----------------------|-------------------------|
-| Slots libres / ocupados (sin nombres) | Resumen de **su** cita (cookie) | Todas las citas, clientes, historial |
-| Servicios, profesionales, precios | Cancelar/reprogramar la suya | Audit, reportes, etc. |
+| Slots libres / ocupados (`booked/capacity`, sin nombres) | Resumen de **sus** citas (cookie + `mias`) | Todas las citas, clientes, historial |
+| Servicios, profesionales, precios | Cancelar la suya con `cancelToken` | Audit, users (super_admin), branding sistema |
+
+Más reglas operativas: [`practicas.md`](practicas.md).
+

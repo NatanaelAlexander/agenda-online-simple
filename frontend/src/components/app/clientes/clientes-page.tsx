@@ -243,6 +243,26 @@ export function ClientesPage() {
               No hay clientes con esos filtros.
             </p>
           ) : (
+            <>
+            <div className="space-y-2 md:hidden">
+              {items.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className="w-full rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+                  onClick={() => setSelectedClient(c)}
+                >
+                  <p className="truncate text-sm font-medium">{c.fullName}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {c.email ?? "Sin correo"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {c.phone ?? "Sin teléfono"} · {c.visitCount ?? 0} visitas
+                  </p>
+                </button>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-muted-foreground">
@@ -276,6 +296,8 @@ export function ClientesPage() {
                 ))}
               </tbody>
             </table>
+            </div>
+            </>
           )}
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

@@ -27,6 +27,7 @@ export interface Appointment {
   serviceName: string | null;
   professionalName: string | null;
   clientName: string;
+  cancelToken?: string;
   clientEmail: string | null;
   /** portal = web pública; internal = panel */
   bookingSource?: "portal" | "internal" | string;

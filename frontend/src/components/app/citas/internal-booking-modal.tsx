@@ -244,7 +244,7 @@ export function InternalBookingModal({
         onClick={onClose}
       />
       <div className="relative z-10 flex max-h-[100dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-border bg-background shadow-xl sm:max-h-[92dvh] sm:rounded-2xl">
-        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-3 py-2.5 sm:px-5">
           <div className="min-w-0">
             <h2
               id="internal-booking-title"
@@ -259,7 +259,7 @@ export function InternalBookingModal({
           </Button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5">
           {loadingCatalog ? (
             <p className="text-sm text-muted-foreground">Cargando agenda…</p>
           ) : !catalog ? (

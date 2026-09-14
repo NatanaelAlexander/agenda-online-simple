@@ -4,6 +4,7 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { ThrottlerException } from '@nestjs/throttler';
 import type { Response } from 'express';
@@ -27,6 +28,8 @@ function extraerMensaje(body: string | object): string | string[] {
 
 @Catch()
 export class AppExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(AppExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
 
@@ -41,6 +44,12 @@ export class AppExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       const body = exception.getResponse();
+      if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+        this.logger.error(
+          `HTTP ${status}`,
+          exception instanceof Error ? exception.stack : String(exception),
+        );
+      }
       const payload: ErrorResponse = {
         statusCode: status,
         mensaje: extraerMensaje(body),
@@ -49,6 +58,11 @@ export class AppExceptionFilter implements ExceptionFilter {
       response.status(status).json(payload);
       return;
     }
+
+    this.logger.error(
+      'Error no controlado',
+      exception instanceof Error ? exception.stack : String(exception),
+    );
 
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,

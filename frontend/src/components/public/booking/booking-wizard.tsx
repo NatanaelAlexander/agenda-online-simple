@@ -8,8 +8,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { portalGetCatalog, type PortalCatalog } from "@/components/app/api/businesses";
 import {
   googleBookingAuthUrl,
-  portalAppointmentStatus,
   portalCancel,
+  portalMyAppointments,
   portalSlots,
   normalizePortalSlots,
   type PortalSlot,
@@ -108,30 +108,33 @@ export function BookingWizard({
     if (local.length === 0) return;
 
     let cancelled = false;
-    void Promise.all(
-      local.map(async (item) => {
-        if (!item.cancelToken) return item;
-        try {
-          const appt = await portalAppointmentStatus(item.cancelToken);
-          return {
+    const tokens = local.map((item) => item.cancelToken).filter(Boolean);
+    void portalMyAppointments({ cancelTokens: tokens, businessSlug: slug })
+      .then((appts) => {
+        if (cancelled) return;
+        const byToken = new Map(
+          appts.map((appt) => [appt.cancelToken, appt] as const),
+        );
+        for (const item of local) {
+          const appt = byToken.get(item.cancelToken);
+          if (!appt) continue;
+          setBookingCookie({
             ...item,
             statusCode: appt.statusCode,
             cancelledBy:
               (appt.cancelledBy as BookingSummary["cancelledBy"]) ?? null,
-            startsAt: appt.startsAt,
-            endsAt: appt.endsAt,
+            startsAt: String(appt.startsAt),
+            endsAt: String(appt.endsAt),
             serviceName: appt.serviceName ?? "Por definir",
             professionalName: appt.professionalName ?? "Por definir",
-          } satisfies BookingSummary;
-        } catch {
-          return item;
+            cancelToken: appt.cancelToken || item.cancelToken,
+          });
         }
-      }),
-    ).then((next) => {
-      if (cancelled) return;
-      for (const item of next) setBookingCookie(item);
-      setBookings(getBookingsForSlug(slug));
-    });
+        setBookings(getBookingsForSlug(slug));
+      })
+      .catch(() => {
+        /* cookie sigue como caché local */
+      });
 
     return () => {
       cancelled = true;

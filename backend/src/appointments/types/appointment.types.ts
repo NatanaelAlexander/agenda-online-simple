@@ -48,6 +48,8 @@ export interface AppointmentDetail extends Appointment {
   clientPhone: string | null;
 }
 
+export type StaffAppointmentDetail = Omit<AppointmentDetail, 'cancelToken'>;
+
 export interface AppointmentFilters {
   businessId?: string;
   professionalId?: string;
@@ -61,7 +63,7 @@ export interface AppointmentFilters {
 }
 
 export interface PaginatedAppointments {
-  items: AppointmentDetail[];
+  items: StaffAppointmentDetail[];
   total: number;
   page: number;
   pageSize: number;
@@ -109,6 +111,6 @@ export interface BookingCookiePayload {
 }
 
 export interface ConfirmPortalResult {
-  appointment: AppointmentDetail;
+  appointment: StaffAppointmentDetail;
   cookiePayload: BookingCookiePayload;
 }

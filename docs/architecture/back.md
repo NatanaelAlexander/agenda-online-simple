@@ -2,6 +2,8 @@
 
 Misma línea que **Team Prime Digital**: NestJS modular por dominio, sin ORM, SQL parametrizado con `pg`, errores en español.
 
+**Antes de tocar citas, branding o permisos:** leer [`practicas.md`](practicas.md) (cupos por profesional, `cancelToken`, `system:manage`, validación de ventana).
+
 ---
 
 ## Enfoque
@@ -117,6 +119,28 @@ throw new CitaNoEncontradaException();
 
 No usar strings sueltos con `NotFoundException` de Nest.
 
+El filter global **loguea** excepciones no HTTP y HTTP ≥ 500 (stack); al cliente solo `{ statusCode, mensaje }` genérico en 500.
+
+---
+
+## Auth de controllers (RBAC)
+
+| Controller | `@AuthorizeResource` | Acción típica |
+|------------|----------------------|---------------|
+| Dominio (citas, negocio, …) | `appointments`, `businesses`, … | `read` / `create` / `update` / … |
+| Branding instalación | **`system`** | **`manage`** → permiso `system:manage` |
+
+No mezclar branding con `businesses:*`. Detalle y checklist: [`practicas.md`](practicas.md).
+
+### Respuestas de citas
+
+- **Internal:** nunca devolver `cancelToken` (`StaffAppointmentDetail` / `withoutCancelToken`).
+- **Portal:** `cancelToken` solo en cookie / cancel / estado / `POST …/mias`.
+
+### Cupos (`appointments` + `availability`)
+
+Con `professionalId`: busy, lock, schedules y excepciones **scoped al profesional** (horarios del pro con fallback a `business_schedules`). Sin pro: a nivel negocio. Al crear/confirmar: assert `professional_services` + slot en ventana abierta + lock de capacidad. Ver [`practicas.md`](practicas.md) §3 y [`flujos.md`](flujos.md).
+
 ---
 
 ## Rutas y controllers
@@ -211,7 +235,10 @@ Contratos útiles:
 | POST | `/api/internal/professionals/schedules/listar` | `{ professionalId }` |
 | POST | `/api/internal/professionals/set-schedules` | Reemplaza semana completa |
 | GET | `/api/portal/businesses/:slug/catalog` | Incluye `schedules[]` por profesional |
-| POST | `/api/portal/appointments/slots` | Slots ISO UTC del día |
+| POST | `/api/portal/appointments/slots` | Slots del día (`booked` / `capacity` / `remaining`) |
+| POST | `/api/portal/appointments/mias` | Mis citas por `cancelTokens[]` (+ `businessSlug` opcional) |
+| POST | `/api/portal/appointments/confirm` | Bearer booking token; cita `pending` hasta aceptación staff |
+| GET | `/health` (o `/api/health`) | Health real (`status` + `postgres`); e2e no uses Hello World |
 
 Los features concretos se irán cerrando con [`../features.md`](../features.md).
 
@@ -248,25 +275,27 @@ Estructura por feature: `backend/src/<feature>/tests/{unit,api}/`.
 1. Carpeta `backend/src/xxx/` con estructura estándar.
 2. Alinear `queries/` con tablas de `backend/BD/migration/`.
 3. `types/` con interfaces de filas SQL.
-4. `dto/` con mensajes en español.
+4. `dto/` con mensajes en español; **todos** los campos del body con validators si `forbidNonWhitelisted`.
 5. `exceptions/` extendiendo `AppException`.
-6. Controllers `/internal/...` y `/portal/...` según corresponda.
+6. Controllers `/internal/...` y `/portal/...` según corresponda; resource/action correctos (ver § Auth).
 7. Service: solo valores en `params` de `db.query()`; nunca interpolar input en SQL.
 8. Registrar módulo en `app.module.ts`.
 9. Tests: unit de lógica + **API contrato por endpoint** (`tests/api/`, sin BD).
+10. Si toca citas/auth/panel: checklist de [`practicas.md`](practicas.md) §7.
 
 ---
 
 ## Pendiente (base)
 
-- [ ] `common/database` (DatabaseModule / DatabaseService)
-- [ ] `common/storage` R2 (`R2_*` en `.env`)
-- [ ] `AppException` + filter + ValidationPipe en español
-- [ ] Prefix `api` + CORS (ya parcial en `main.ts`)
-- [ ] Auth interno: email+password + reset + JWT + `refresh_sessions` (sin signup público)
-- [ ] Google OAuth **solo** en flujo de reserva + cookie resumen cliente
-- [ ] Features `assets` + `audit`
-- [ ] Primer feature de dominio (negocio / servicios / citas)
+- [x] `common/database` (DatabaseModule / DatabaseService)
+- [x] `common/storage` R2 (`R2_*` en `.env`)
+- [x] `AppException` + filter + ValidationPipe en español
+- [x] Prefix `api` + CORS (ya parcial en `main.ts`)
+- [x] Auth interno: email+password + reset + JWT + `refresh_sessions` (sin signup público)
+- [x] Google OAuth **solo** en flujo de reserva + cookie resumen cliente
+- [x] Features `assets` + `audit`
+- [x] Features de dominio (negocio / servicios / citas / …)
 - [x] Scalar `/api/reference` + OpenAPI `/api/docs/json`
-- [ ] Helper `create-api-test-app` + convención `tests/unit` + `tests/api`
+- [x] Helper `create-api-test-app` + convención `tests/unit` + `tests/api`
 - [x] Workflow GitHub Actions: **solo `push` a `main`** + script `./scripts/test-backend.sh`
+- [x] Prácticas de cupos / `cancelToken` / `system:manage` documentadas ([`practicas.md`](practicas.md))

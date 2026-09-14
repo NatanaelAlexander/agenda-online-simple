@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsDateString,
   IsIn,
   IsInt,
@@ -196,4 +197,20 @@ export class CancelPortalAppointmentDto {
   @MinLength(16, { message: 'cancelToken inválido' })
   @MaxLength(64, { message: 'cancelToken inválido' })
   cancelToken!: string;
+}
+
+
+export class PortalMineAppointmentsDto {
+  @ApiProperty({ type: [String], description: 'cancelTokens de la cookie' })
+  @IsArray({ message: 'cancelTokens debe ser un arreglo' })
+  @IsString({ each: true, message: 'Cada cancelToken debe ser texto' })
+  @MinLength(16, { each: true, message: 'cancelToken inválido' })
+  @MaxLength(64, { each: true, message: 'cancelToken inválido' })
+  cancelTokens!: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  businessSlug?: string;
 }

@@ -18,6 +18,7 @@ Agenda online sencilla. Stack alineado con Team Prime Digital:
 | [`docs/architecture/flujos.md`](docs/architecture/flujos.md) | Flujos auth interno + reserva Google + cookies |
 | [`docs/mer.md`](docs/mer.md) | MER (diagrama + auth/RBAC) |
 | [`docs/architecture/back.md`](docs/architecture/back.md) | Arquitectura NestJS (igual TPD) |
+| [`docs/architecture/practicas.md`](docs/architecture/practicas.md) | **Buenas prácticas** (cupos, auth, cancelToken, panel) |
 | [`docs/architecture/deps.md`](docs/architecture/deps.md) | Librerías instaladas (JWT, sockets, R2, …) |
 | [`docs/architecture/tests.md`](docs/architecture/tests.md) | Tests unit + API contrato + CI GitHub |
 | [`docs/architecture/front.md`](docs/architecture/front.md) | Arquitectura Next.js (igual TPD) |

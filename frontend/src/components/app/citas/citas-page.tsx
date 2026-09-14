@@ -385,12 +385,72 @@ export function CitasPage() {
             </span>
           </div>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="space-y-3">
           {loading ? (
             <p className="text-sm text-muted-foreground">Cargando…</p>
           ) : items.length === 0 ? (
             <p className="text-sm text-muted-foreground">No hay citas con esos filtros.</p>
           ) : (
+            <>
+            <div className="space-y-2 md:hidden">
+              {items.map((row) => (
+                <div
+                  key={row.id}
+                  className="rounded-lg border border-border px-3 py-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{row.clientName}</p>
+                      <p className="text-xs text-muted-foreground tabular-nums">
+                        {formatDateTime(row.startsAt)}
+                      </p>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {row.serviceName ?? "—"} · {row.professionalName ?? "—"}
+                      </p>
+                      <p className="mt-1 text-xs">{row.statusName}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {row.statusCode !== "confirmed" ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8"
+                        disabled={reviewingId === row.id}
+                        onClick={() => void handleAccept(row.id)}
+                      >
+                        Aceptar
+                      </Button>
+                    ) : null}
+                    {row.statusCode === "pending" ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        disabled={reviewingId === row.id}
+                        onClick={() => void handleReject(row.id)}
+                      >
+                        Rechazar
+                      </Button>
+                    ) : null}
+                    {row.statusCode !== "cancelled" ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8"
+                        disabled={cancellingId === row.id}
+                        onClick={() => void handleCancel(row.id)}
+                      >
+                        Cancelar
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-muted-foreground">
@@ -483,6 +543,8 @@ export function CitasPage() {
                 ))}
               </tbody>
             </table>
+            </div>
+            </>
           )}
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

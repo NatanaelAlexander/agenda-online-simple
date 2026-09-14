@@ -2,6 +2,8 @@
 
 Misma línea que **Team Prime Digital**: Next.js (App Router) + React + Tailwind. El frontend **solo consume** la API Nest; no define backend propio.
 
+**Panel / portal / permisos:** ver también [`practicas.md`](practicas.md).
+
 ---
 
 ## Stack
@@ -79,18 +81,23 @@ La page **solo monta** el componente. Misma ruta de carpetas:
 - Staff: `/login` → email+password → `/app`. **Sin “registrarse”.**
 - Recuperar contraseña: flujo email → token → nueva password.
 - `AuthProvider` solo para panel interno.
+- **`AppGuard`:** exige sesión en `/app/*`. Rutas sensibles (p. ej. `/app/interno`) usan `requiredRoles={['super_admin']}` + `middleware.ts` (cookie `aos_access`).
+- **Sidebar:** ítems filtrados por `claims.permissions` / `roles` (`canSeeNavItem`). Interno y “Estilos del sistema” no se muestran a quien no corresponde.
 - **Home `/`:** reserva branded (slug por defecto `NEXT_PUBLIC_DEFAULT_BUSINESS_SLUG`) + calendario.
 - Página pública `/r/[slug]`:
   - Wizard: servicio → profesional → **calendario**.
   - Logo del negocio (si hay) arriba del nombre.
   - Días sin horario del profesional o con **excepción cerrada** quedan **opacos / deshabilitados**.
   - Al elegir un día, los **slots se abren en overlay** encima del calendario (Volver / Confirmar con Google).
-  - Si existe cookie `aos_booking` → bloque “Tu hora”.
+  - Contador de cupo: **`booked/capacity`** (lleno → slot deshabilitado).
+  - Cookie `aos_booking` (array multi-cita) = caché; al montar, sync con `POST /portal/appointments/mias`.
+  - “Revisar mis horas” + marcadores de días con reserva propia.
   - Al confirmar: Google OAuth → callback → cookie + redirect `?ok=1`.
 - Panel `/app/profesionales`: **horarios semanales** + **excepciones** (festivos / cerrado local o por pro) → `set-schedules` y `exceptions/*`.
 - Pie del sidebar: menú de usuario (Perfil, Configuración, Estilos, Términos, Logout).
-- `/app/estilos`: colores de instalación + layout home (`classic` / `split` / `compact`).
+- `/app/estilos`: colores de instalación + layout home (`classic` / `split` / `compact`); gated por `super_admin` / `system:manage`.
 - Panel `/app/negocio`: datos + **logo** (JPG/PNG/WEBP ≤30 MB) + **QR / PDF** de reserva (`NEXT_PUBLIC_SITE_URL/r/{slug}`).
+- Listas densas (citas, clientes, profesionales): tabla en `md+`, **cards** en móvil.
 - Precios en UI: **CLP** (`es-CL`).
 - Permisos UI vía helpers; **la API es la fuente de verdad** para internos.
 
@@ -132,3 +139,5 @@ Contrato HTTP: [`back.md`](back.md). Flujos: [`flujos.md`](flujos.md).
 - [x] Generador QR / PDF de link público
 - [x] Panel citas: alta interna, filtros, paginación 10/20/30
 - [x] Inicio: resumen + gráfico citas por día
+- [x] Guard/middleware Interno + nav por permisos
+- [x] Cookie multi-cita + sync `mias` + cards móvil en listados

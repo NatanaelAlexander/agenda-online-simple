@@ -35,8 +35,11 @@ import {
   SQL_FIND_BUSINESS_BY_SLUG,
   SQL_FIND_CLIENT_BY_ID,
   SQL_FIND_CLIENT_FOR_UPSERT,
+  SQL_ASSERT_PROFESSIONAL_SERVICE,
+  SQL_FIND_APPOINTMENTS_BY_CANCEL_TOKENS,
   SQL_FIND_EXCEPTIONS,
   SQL_FIND_PROFESSIONAL,
+  SQL_FIND_PROFESSIONAL_SCHEDULES,
   SQL_FIND_REMINDER_CANDIDATES,
   SQL_FIND_SCHEDULES,
   SQL_FIND_SERVICE_TIMING,
@@ -59,6 +62,7 @@ import type {
   CreateAppointmentInput,
   PaginatedAppointments,
   PortalSlotsInput,
+  StaffAppointmentDetail,
 } from './types/appointment.types.js';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -109,6 +113,21 @@ interface StatusRow {
   name: string;
 }
 
+
+function withoutCancelToken(
+  appointment: AppointmentDetail,
+): StaffAppointmentDetail {
+  const { cancelToken: _omit, ...rest } = appointment;
+  return rest;
+}
+
+function pickDayExceptions<T extends { professionalId?: string | null }>(
+  rows: T[],
+): T[] {
+  const specific = rows.filter((row) => row.professionalId != null);
+  return specific.length > 0 ? specific : rows;
+}
+
 @Injectable()
 export class AppointmentsService {
   private readonly logger = new Logger(AppointmentsService.name);
@@ -149,10 +168,14 @@ export class AppointmentsService {
       offset,
     ]);
 
-    return { items: rows, total, page, pageSize };
+    return { items: rows.map(withoutCancelToken), total, page, pageSize };
   }
 
-  async findById(id: string): Promise<AppointmentDetail> {
+  async findById(id: string): Promise<StaffAppointmentDetail> {
+    return withoutCancelToken(await this.loadById(id));
+  }
+
+  private async loadById(id: string): Promise<AppointmentDetail> {
     const { rows } = await this.db.query<AppointmentDetail>(
       SQL_FIND_APPOINTMENT_BY_ID,
       [id],
@@ -163,7 +186,7 @@ export class AppointmentsService {
     return rows[0];
   }
 
-  async create(input: CreateAppointmentInput): Promise<AppointmentDetail> {
+  async create(input: CreateAppointmentInput): Promise<StaffAppointmentDetail> {
     const business = await this.requireBusinessById(input.businessId);
     const service = await this.requireService(input.serviceId);
     const professional = await this.requireProfessional(input.professionalId);
@@ -176,6 +199,15 @@ export class AppointmentsService {
     const status = await this.requireStatus(statusCode);
     const maxConcurrent = Math.max(1, business.maxBookingsPerSlot ?? 1);
 
+    await this.assertProfessionalOffersService(professional.id, service.id);
+    await this.assertStartsInOpenWindow({
+      businessSlug: business.slug,
+      serviceId: service.id,
+      professionalId: professional.id,
+      startsAt,
+      requireBookingEnabled: false,
+    });
+
     const id = await this.db.transaction(async (query) => {
       await this.assertSlotCapacity(
         query,
@@ -184,6 +216,7 @@ export class AppointmentsService {
         endsAt,
         maxConcurrent,
         null,
+        professional.id,
       );
       const cancelToken = createCancelToken();
       const { rows } = await query<{ id: string }>(SQL_INSERT_APPOINTMENT, [
@@ -207,7 +240,7 @@ export class AppointmentsService {
   async changeStatus(
     id: string,
     statusCode: string,
-  ): Promise<AppointmentDetail> {
+  ): Promise<StaffAppointmentDetail> {
     const current = await this.findById(id);
     const status = await this.requireStatus(statusCode);
     const wasOccupying = occupiesSlot(current.statusCode);
@@ -230,6 +263,7 @@ export class AppointmentsService {
           new Date(current.endsAt),
           maxConcurrent,
           id,
+          current.professionalId,
         );
         await query(SQL_UPDATE_STATUS, [id, status.id]);
       });
@@ -252,7 +286,7 @@ export class AppointmentsService {
     return updated;
   }
 
-  async accept(id: string): Promise<AppointmentDetail> {
+  async accept(id: string): Promise<StaffAppointmentDetail> {
     const current = await this.findById(id);
     if (current.statusCode === 'confirmed') {
       return current;
@@ -260,7 +294,7 @@ export class AppointmentsService {
     return this.changeStatus(id, 'confirmed');
   }
 
-  async reject(id: string): Promise<AppointmentDetail> {
+  async reject(id: string): Promise<StaffAppointmentDetail> {
     const current = await this.findById(id);
     if (current.statusCode === 'cancelled') {
       return current;
@@ -273,7 +307,7 @@ export class AppointmentsService {
   async reschedule(
     id: string,
     startsAtInput: string | Date,
-  ): Promise<AppointmentDetail> {
+  ): Promise<StaffAppointmentDetail> {
     const current = await this.findById(id);
     if (current.statusCode === 'cancelled') {
       throw new CitaYaCanceladaException();
@@ -289,6 +323,14 @@ export class AppointmentsService {
       resolveServiceDuration(service?.durationMinutes ?? null),
     );
 
+    await this.assertStartsInOpenWindow({
+      businessSlug: business.slug,
+      serviceId: current.serviceId,
+      professionalId: current.professionalId,
+      startsAt,
+      requireBookingEnabled: false,
+    });
+
     await this.db.transaction(async (query) => {
       await this.assertSlotCapacity(
         query,
@@ -297,6 +339,7 @@ export class AppointmentsService {
         endsAt,
         Math.max(1, business.maxBookingsPerSlot ?? 1),
         current.id,
+        current.professionalId,
       );
       await query(SQL_UPDATE_SCHEDULE, [
         current.id,
@@ -310,7 +353,7 @@ export class AppointmentsService {
     return updated;
   }
 
-  async cancel(id: string): Promise<AppointmentDetail> {
+  async cancel(id: string): Promise<StaffAppointmentDetail> {
     const current = await this.findById(id);
     if (current.statusCode === 'cancelled') {
       throw new CitaYaCanceladaException();
@@ -326,7 +369,10 @@ export class AppointmentsService {
     return updated;
   }
 
-  async getPortalSlots(input: PortalSlotsInput): Promise<{
+  async getPortalSlots(
+    input: PortalSlotsInput,
+    options: { requireBookingEnabled?: boolean } = {},
+  ): Promise<{
     slots: Array<{
       startsAt: string;
       booked: number;
@@ -334,7 +380,9 @@ export class AppointmentsService {
       remaining: number;
     }>;
   }> {
-    const business = await this.requireBusinessBySlug(input.businessSlug);
+    const business = await this.requireBusinessBySlug(input.businessSlug, {
+      requireBookingEnabled: options.requireBookingEnabled,
+    });
 
     let durationMinutes = 30;
     let prepMinutes = 0;
@@ -357,33 +405,61 @@ export class AppointmentsService {
       }
     }
 
+    if (input.professionalId && input.serviceId) {
+      await this.assertProfessionalOffersService(
+        input.professionalId,
+        input.serviceId,
+      );
+    }
+
     const dayStart = zonedLocalToUtc(
       input.date,
       '00:00:00',
       business.timezone,
     );
     const dayEnd = zonedLocalToUtc(input.date, '23:59:59', business.timezone);
+    const professionalId = input.professionalId ?? null;
 
-    const [schedulesResult, exceptionsResult, busyResult] = await Promise.all([
-      this.db.query<{ weekday: number; startTime: string; endTime: string }>(
-        SQL_FIND_SCHEDULES,
-        [business.id],
-      ),
+    const businessSchedules = await this.db.query<{
+      weekday: number;
+      startTime: string;
+      endTime: string;
+    }>(SQL_FIND_SCHEDULES, [business.id]);
+
+    let schedules = businessSchedules.rows;
+    if (professionalId) {
+      const proSchedules = await this.db.query<{
+        weekday: number;
+        startTime: string;
+        endTime: string;
+      }>(SQL_FIND_PROFESSIONAL_SCHEDULES, [professionalId]);
+      if (proSchedules.rows.length > 0) {
+        schedules = proSchedules.rows;
+      }
+    }
+
+    const [exceptionsResult, busyResult] = await Promise.all([
       this.db.query<{
         exceptionDate: string;
         isClosed: boolean;
         startTime: string | null;
         endTime: string | null;
-      }>(SQL_FIND_EXCEPTIONS, [input.date, business.id]),
+        professionalId: string | null;
+      }>(SQL_FIND_EXCEPTIONS, [input.date, business.id, professionalId]),
       this.db.query<{ startsAt: Date; endsAt: Date }>(
         SQL_FIND_BUSY_APPOINTMENTS,
-        [business.id, dayStart.toISOString(), dayEnd.toISOString()],
+        [
+          business.id,
+          dayStart.toISOString(),
+          dayEnd.toISOString(),
+          professionalId,
+        ],
       ),
     ]);
 
     const occupancy = this.availability.computeSlotOccupancy({
-      schedules: schedulesResult.rows,
-      exceptions: exceptionsResult.rows,
+      schedules,
+      exceptions: pickDayExceptions(exceptionsResult.rows),
       existingAppointments: busyResult.rows,
       durationMinutes,
       prepMinutes,
@@ -427,6 +503,9 @@ export class AppointmentsService {
     if (professional && professional.businessId !== business.id) {
       throw new ProfesionalServicioInvalidoException();
     }
+    if (professional && service) {
+      await this.assertProfessionalOffersService(professional.id, service.id);
+    }
 
     const startsAt = new Date(input.startsAt);
     const endsAt = addMinutes(
@@ -436,6 +515,13 @@ export class AppointmentsService {
     const status = await this.requireStatus('pending');
     const maxConcurrent = Math.max(1, business.maxBookingsPerSlot ?? 1);
 
+    await this.assertStartsInOpenWindow({
+      businessSlug: business.slug,
+      serviceId: service?.id ?? null,
+      professionalId: professional?.id ?? null,
+      startsAt,
+    });
+
     const appointmentId = await this.db.transaction(async (query) => {
       await this.assertSlotCapacity(
         query,
@@ -444,6 +530,7 @@ export class AppointmentsService {
         endsAt,
         maxConcurrent,
         null,
+        professional?.id ?? null,
       );
       const client = await this.upsertClient(query, {
         businessId: business.id,
@@ -469,10 +556,10 @@ export class AppointmentsService {
 
     await this.bookingSessions.consume(bookingToken.trim());
 
-    const appointment = await this.findById(appointmentId);
+    const appointment = await this.loadById(appointmentId);
 
     return {
-      appointment,
+      appointment: withoutCancelToken(appointment),
       cookiePayload: toCookiePayload(appointment),
     };
   }
@@ -495,7 +582,7 @@ export class AppointmentsService {
       status.id,
       'client',
     ]);
-    const updated = await this.findById(rows[0].id);
+    const updated = await this.loadById(rows[0].id);
     await this.sendCancelledEmail(updated);
     return updated;
   }
@@ -539,6 +626,7 @@ export class AppointmentsService {
     endsAt: Date,
     maxConcurrent: number,
     excludeId: string | null,
+    professionalId: string | null = null,
   ): Promise<void> {
     const { rows } = await query<{ id: string }>(
       SQL_LOCK_OVERLAPPING_APPOINTMENTS,
@@ -547,11 +635,83 @@ export class AppointmentsService {
         startsAt.toISOString(),
         endsAt.toISOString(),
         excludeId,
+        professionalId,
       ],
     );
     if (rows.length >= maxConcurrent) {
       throw new HorarioNoDisponibleException();
     }
+  }
+
+  private async assertProfessionalOffersService(
+    professionalId: string,
+    serviceId: string,
+  ): Promise<void> {
+    const { rows } = await this.db.query<{ ok: number }>(
+      SQL_ASSERT_PROFESSIONAL_SERVICE,
+      [professionalId, serviceId],
+    );
+    if (!rows[0]) {
+      throw new ProfesionalServicioInvalidoException();
+    }
+  }
+
+  private async assertStartsInOpenWindow(input: {
+    businessSlug: string;
+    serviceId?: string | null;
+    professionalId?: string | null;
+    startsAt: Date;
+    requireBookingEnabled?: boolean;
+  }): Promise<void> {
+    const business = await this.requireBusinessBySlug(input.businessSlug, {
+      requireBookingEnabled: input.requireBookingEnabled ?? true,
+    });
+    const localDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: business.timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(input.startsAt);
+
+    const { slots } = await this.getPortalSlots(
+      {
+        businessSlug: input.businessSlug,
+        serviceId: input.serviceId,
+        professionalId: input.professionalId,
+        date: localDate,
+      },
+      { requireBookingEnabled: input.requireBookingEnabled ?? true },
+    );
+
+    const target = input.startsAt.getTime();
+    const match = slots.find(
+      (slot) =>
+        new Date(slot.startsAt).getTime() === target && slot.remaining > 0,
+    );
+    if (!match) {
+      throw new HorarioNoDisponibleException();
+    }
+  }
+
+  async listPortalByCancelTokens(input: {
+    cancelTokens: string[];
+    businessSlug?: string | null;
+  }): Promise<AppointmentDetail[]> {
+    const tokens = [
+      ...new Set(
+        input.cancelTokens
+          .map((token) => token.trim())
+          .filter((token) => token.length >= 16),
+      ),
+    ].slice(0, 50);
+    if (tokens.length === 0) {
+      return [];
+    }
+    const { rows } = await this.db.query<AppointmentDetail>(
+      SQL_FIND_APPOINTMENTS_BY_CANCEL_TOKENS,
+      [tokens, input.businessSlug ?? null],
+    );
+    return rows;
   }
 
   private async upsertClient(
@@ -623,14 +783,20 @@ export class AppointmentsService {
     return rows[0];
   }
 
-  private async requireBusinessBySlug(slug: string): Promise<BusinessRow> {
+  private async requireBusinessBySlug(
+    slug: string,
+    options: { requireBookingEnabled?: boolean } = {},
+  ): Promise<BusinessRow> {
     const { rows } = await this.db.query<BusinessRow>(SQL_FIND_BUSINESS_BY_SLUG, [
       slug,
     ]);
     if (!rows[0]) {
       throw new NegocioNoEncontradoException();
     }
-    if (!rows[0].bookingEnabled) {
+    if (
+      (options.requireBookingEnabled ?? true) &&
+      !rows[0].bookingEnabled
+    ) {
       throw new ReservasDeshabilitadasException();
     }
     return rows[0];
@@ -738,7 +904,7 @@ export class AppointmentsService {
     return `${base}/r/${appointment.businessSlug}?cancel=${appointment.cancelToken}`;
   }
 
-  private formatStartsLabel(appointment: AppointmentDetail): string {
+  private formatStartsLabel(appointment: AppointmentDetail | StaffAppointmentDetail): string {
     return new Intl.DateTimeFormat('es-CL', {
       dateStyle: 'full',
       timeStyle: 'short',
@@ -746,17 +912,23 @@ export class AppointmentsService {
     }).format(new Date(appointment.startsAt));
   }
 
-  private displayServiceName(appointment: AppointmentDetail): string {
+  private displayServiceName(appointment: AppointmentDetail | StaffAppointmentDetail): string {
     return appointment.serviceName?.trim() || 'Por definir';
   }
 
-  private displayProfessionalName(appointment: AppointmentDetail): string {
+  private displayProfessionalName(
+    appointment: AppointmentDetail | StaffAppointmentDetail,
+  ): string {
     return appointment.professionalName?.trim() || 'Por definir';
   }
 
   private async sendConfirmedEmail(
-    appointment: AppointmentDetail,
+    appointment: AppointmentDetail | StaffAppointmentDetail,
   ): Promise<void> {
+    const full =
+      'cancelToken' in appointment && appointment.cancelToken
+        ? (appointment as AppointmentDetail)
+        : await this.loadById(appointment.id);
     if (!appointment.clientEmail) return;
     await this.mail.send({
       to: appointment.clientEmail,
@@ -766,15 +938,19 @@ export class AppointmentsService {
         businessName: appointment.businessName,
         serviceName: this.displayServiceName(appointment),
         professionalName: this.displayProfessionalName(appointment),
-        startsAtLabel: this.formatStartsLabel(appointment),
-        cancelUrl: this.cancelUrl(appointment),
+        startsAtLabel: this.formatStartsLabel(full),
+        cancelUrl: this.cancelUrl(full),
       }),
     });
   }
 
   private async sendCancelledEmail(
-    appointment: AppointmentDetail,
+    appointment: AppointmentDetail | StaffAppointmentDetail,
   ): Promise<void> {
+    const full =
+      'cancelToken' in appointment && appointment.cancelToken
+        ? (appointment as AppointmentDetail)
+        : await this.loadById(appointment.id);
     if (!appointment.clientEmail) return;
     await this.mail.send({
       to: appointment.clientEmail,
@@ -783,14 +959,18 @@ export class AppointmentsService {
         clientName: appointment.clientName,
         businessName: appointment.businessName,
         serviceName: this.displayServiceName(appointment),
-        startsAtLabel: this.formatStartsLabel(appointment),
+        startsAtLabel: this.formatStartsLabel(full),
       }),
     });
   }
 
   private async sendRescheduledEmail(
-    appointment: AppointmentDetail,
+    appointment: AppointmentDetail | StaffAppointmentDetail,
   ): Promise<void> {
+    const full =
+      'cancelToken' in appointment && appointment.cancelToken
+        ? (appointment as AppointmentDetail)
+        : await this.loadById(appointment.id);
     if (!appointment.clientEmail) return;
     await this.mail.send({
       to: appointment.clientEmail,
@@ -799,15 +979,19 @@ export class AppointmentsService {
         clientName: appointment.clientName,
         businessName: appointment.businessName,
         serviceName: this.displayServiceName(appointment),
-        startsAtLabel: this.formatStartsLabel(appointment),
-        cancelUrl: this.cancelUrl(appointment),
+        startsAtLabel: this.formatStartsLabel(full),
+        cancelUrl: this.cancelUrl(full),
       }),
     });
   }
 
   private async sendReminderEmail(
-    appointment: AppointmentDetail,
+    appointment: AppointmentDetail | StaffAppointmentDetail,
   ): Promise<void> {
+    const full =
+      'cancelToken' in appointment && appointment.cancelToken
+        ? (appointment as AppointmentDetail)
+        : await this.loadById(appointment.id);
     if (!appointment.clientEmail) return;
     await this.mail.send({
       to: appointment.clientEmail,
@@ -817,8 +1001,8 @@ export class AppointmentsService {
         businessName: appointment.businessName,
         serviceName: this.displayServiceName(appointment),
         professionalName: this.displayProfessionalName(appointment),
-        startsAtLabel: this.formatStartsLabel(appointment),
-        cancelUrl: this.cancelUrl(appointment),
+        startsAtLabel: this.formatStartsLabel(full),
+        cancelUrl: this.cancelUrl(full),
       }),
     });
   }
