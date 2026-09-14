@@ -1,16 +1,24 @@
-# Base de datos (BD)
+# Migraciones PostgreSQL
 
-Ver la arquitectura completa en:
+## Esquema
 
-[`docs/architecture/bd.md`](../../docs/architecture/bd.md)
-
-## Estructura
-
+```bash
+cd backend && pnpm migrate
 ```
-BD/
-├── migration/          ← CREATE TABLE (esquema)
-├── data-migration/     ← INSERT (catálogos y seeds)
-├── run-migrations.ts   ← pendiente
-├── run-data-migrations.ts ← pendiente
-└── README.md
+
+Aplica `migration/*.sql` en orden.
+
+## Seeds
+
+```bash
+cd backend && pnpm migrate:data
 ```
+
+Aplica `data-migration/*.sql` (permissions, roles, users).
+
+| Usuario | Password | Rol |
+|---------|----------|-----|
+| `superadmin@agenda.local` | `superadmin` | `super_admin` |
+| `admin@agenda.local` | `admin` | `admin` |
+
+Requiere Postgres arriba (`docker compose up bd_main -d`) y `DATABASE_URL` en `.env`.

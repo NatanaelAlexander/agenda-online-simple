@@ -4,6 +4,8 @@ Misma línea que **Team Prime Digital**: PostgreSQL + migraciones SQL versionada
 
 Código vivo en: `backend/BD/`.
 
+MER visual (entidades + RBAC): [`../mer.md`](../mer.md).
+
 ---
 
 ## Estructura
@@ -27,13 +29,19 @@ Dominios previstos (alineados a [`../features.md`](../features.md)):
 
 | Orden tentativo | Dominio | Contenido típico |
 |-----------------|---------|------------------|
-| 1 | users / auth | usuarios del negocio, roles básicos |
-| 2 | businesses | negocio, branding, zona horaria |
-| 3 | services | servicios, duración, precio, buffers |
-| 4 | professionals | profesionales, horarios, excepciones |
-| 5 | clients | fichas de clientes finales |
-| 6 | appointments | citas, estados, vínculos |
-| 7 | … | packs, recurrentes, depósitos (V2) |
+| 1 | users / auth | users (password), roles, permissions, refresh_sessions |
+| 2 | assets / audit | `assets`, `audit_logs`, `system_assets` (logo de la app) |
+| 3 | businesses | negocio, `businesses_assets` (`kind`: logo/cover/gallery) |
+| 4 | services | servicios + `services_assets` |
+| 5 | professionals | profesionales, horarios, excepciones, `professionals_assets` |
+| 6 | clients | fichas de clientes finales |
+| 7 | appointments | citas, estados, vínculos |
+| 8 | password reset | tokens reset |
+| 9 | booking QR meta | `businesses.booking_enabled`, `qr_poster_headline`, `qr_poster_footer` (`011_…`) |
+| 10 | services price optional | `services.price_cents` nullable (`012_…`) |
+| 11 | services duration optional | `services.duration_minutes` nullable (`013_…`; slots usan 30 min) |
+| 12 | app_branding | colores + layout home de la instalación (`014_…`) |
+| 13 | … | packs, recurrentes, depósitos (V2) |
 
 El orden exacto se fija al escribir el primer `.sql`.
 

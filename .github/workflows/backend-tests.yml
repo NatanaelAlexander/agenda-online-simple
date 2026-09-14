@@ -1,0 +1,39 @@
+name: Backend tests
+
+# Solo cuando hay push a main (no otras ramas, no pull_request).
+on:
+  push:
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test:
+    name: Unit + API contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Unit (shared/common + features) + API contrato (sin BD)
+      - name: Run unit and API tests
+        run: pnpm test

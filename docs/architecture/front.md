@@ -66,22 +66,33 @@ La page **solo monta** el componente. Misma ruta de carpetas:
 ## Comunicación con la API
 
 - Base: `NEXT_PUBLIC_API_URL` (default `http://localhost:3000`) → `${API}/api/...`
-- Cliente: `lib/api/client.ts` (`apiFetch`, upload si aplica)
-- Auth panel: cookies de access/refresh + Bearer en requests autenticados
-- Ante `401`: intento de refresh y reintento (cuando exista auth)
-- Dominios: `components/app/api/*.ts` llaman al client
-- Lecturas con filtros: usar **POST …/detalle** o **POST …/listar** (los navegadores no mandan body en GET) — ver [`back.md`](back.md)
+- Cliente HTTP: `lib/api/client.ts`
+- **Panel:** cookies JWT access/refresh tras login email+password
+- **Página pública:** cookie de **reserva del cliente** (resumen de su cita: nombre, email, hora, servicio…). No es sesión de panel
+- Ante `401` en panel: refresh y reintento
+- Lecturas con filtros (panel): **POST …/detalle** o **POST …/listar** — ver [`back.md`](back.md)
 
 ---
 
 ## Auth y layouts
 
-- Preferir **no** depender de `middleware.ts` de Next para reglas de negocio (igual TPD).
-- Root / login: cookie de access → `/app`, si no → `/login`.
-- `AuthProvider`: login/logout, session desde claims JWT.
-- Shell `(app)/app/layout.tsx`: sidebar, nav del negocio.
-- Permisos en UI vía helpers; **la API es la fuente de verdad**.
-- Flujo público de reserva: sin cuenta obligatoria (fricción mínima).
+- Staff: `/login` → email+password → `/app`. **Sin “registrarse”.**
+- Recuperar contraseña: flujo email → token → nueva password.
+- `AuthProvider` solo para panel interno.
+- **Home `/`:** reserva branded (slug por defecto `NEXT_PUBLIC_DEFAULT_BUSINESS_SLUG`) + calendario.
+- Página pública `/r/[slug]`:
+  - Wizard: servicio → profesional → **calendario**.
+  - Logo del negocio (si hay) arriba del nombre.
+  - Días sin horario del profesional o con **excepción cerrada** quedan **opacos / deshabilitados**.
+  - Al elegir un día, los **slots se abren en overlay** encima del calendario (Volver / Confirmar con Google).
+  - Si existe cookie `aos_booking` → bloque “Tu hora”.
+  - Al confirmar: Google OAuth → callback → cookie + redirect `?ok=1`.
+- Panel `/app/profesionales`: **horarios semanales** + **excepciones** (festivos / cerrado local o por pro) → `set-schedules` y `exceptions/*`.
+- Pie del sidebar: menú de usuario (Perfil, Configuración, Estilos, Términos, Logout).
+- `/app/estilos`: colores de instalación + layout home (`classic` / `split` / `compact`).
+- Panel `/app/negocio`: datos + **logo** (JPG/PNG/WEBP ≤30 MB) + **QR / PDF** de reserva (`NEXT_PUBLIC_SITE_URL/r/{slug}`).
+- Precios en UI: **CLP** (`es-CL`).
+- Permisos UI vía helpers; **la API es la fuente de verdad** para internos.
 
 ---
 
@@ -89,17 +100,35 @@ La page **solo monta** el componente. Misma ruta de carpetas:
 
 | Área | Quién | Rutas típicas |
 |------|-------|----------------|
-| Internal (app) | Dueño / profesionales | `/app/*` |
-| Portal / público | Cliente final | `/r/[negocio]` reserva, cancelar, reprogramar |
-| Auth | Negocio | `/login` |
+| Internal (app) | Staff | `/app/*` (inicio+gráficos, citas con alta/filtros, servicios, profesionales+horarios, clientes, negocio+QR) |
+| Auth staff | Staff | `/login`, `/recuperar` |
+| Público | Cliente | `/`, `/r/[slug]`, `/r/booking/callback` |
 
-Contrato HTTP del backend: [`back.md`](back.md).
+Contrato HTTP: [`back.md`](back.md). Flujos: [`flujos.md`](flujos.md).
+
+---
+
+## Dependencias UI relevantes
+
+| Paquete | Uso |
+|---------|-----|
+| `react-day-picker` + Calendar shadcn | Calendario de reserva |
+| `motion` | BlurFade / animaciones overlay slots |
+| `qrcode` + `jspdf` | QR PNG y afiche PDF en Negocio |
+| Magic UI (local) | `BlurFade`, `BorderBeam`, `MagicCard` |
 
 ---
 
 ## Pendiente (base)
 
-- [ ] `lib/api/client.ts`
-- [ ] Estructura `(auth)` / `(app)` / pública de reserva
-- [ ] Wrappers `components/app/api/*` por dominio
-- [ ] AuthProvider cuando exista login
+- [x] `lib/api/client.ts`
+- [x] Estructura `(auth)` / `(app)` / pública de reserva
+- [x] Cookie de reserva del cliente (`aos_booking`) + UI “Tu hora”
+- [x] Wrappers `components/app/api/*` por dominio
+- [x] AuthProvider panel (password) + flujo Google solo en booking
+- [x] Home = calendario de reserva + Magic UI
+- [x] Horarios por profesional (panel) + días cerrados opacos (público)
+- [x] Overlay de slots al elegir día
+- [x] Generador QR / PDF de link público
+- [x] Panel citas: alta interna, filtros, paginación 10/20/30
+- [x] Inicio: resumen + gráfico citas por día

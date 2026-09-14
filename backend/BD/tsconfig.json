@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "types": ["node"]
+  },
+  "include": [
+    "run-migrations.ts",
+    "run-data-migrations.ts",
+    "../src/common/database/database-url.ts"
+  ]
+}

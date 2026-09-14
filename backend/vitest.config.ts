@@ -9,5 +9,7 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.spec.ts'],
+    // Integration con BD: no en `pnpm test` / CI (solo unit + API contrato).
+    exclude: ['**/node_modules/**', '**/tests/integration/**', '**/dist/**'],
   },
 });
